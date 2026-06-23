@@ -12,7 +12,7 @@ keys are never exposed to the browser.
 ## Stack
 
 - **Next.js 15** (App Router) + **React 19** + **TypeScript**
-- **@anthropic-ai/sdk** — reflection generation (`claude-opus-4-8`)
+- **Reflection engine** — switchable in-app between **Groq** (`llama-3.3-70b-versatile`, Fast) and **Google Gemini** (`gemini-2.0-flash`, Balanced), both free tier. Claude is stubbed as "coming soon".
 - OpenAI Whisper — voice-to-text (optional)
 - `localStorage` for entries, saved reflections, and daily progress
 
@@ -24,7 +24,7 @@ app/
   page.tsx              Renders the client app
   globals.css           Original styles, verbatim
   api/
-    reflect/route.ts    Anthropic reflection endpoint (server-side key)
+    reflect/route.ts    Gemini reflection endpoint (server-side key)
     transcribe/route.ts OpenAI Whisper proxy (server-side key)
 components/
   ReflectApp.tsx        State + screen orchestration
@@ -63,10 +63,13 @@ Open [http://localhost:3000](http://localhost:3000).
 
 ### Environment variables
 
-| Variable            | Required | Purpose                                   |
-| ------------------- | -------- | ----------------------------------------- |
-| `ANTHROPIC_API_KEY` | Yes      | Powers reflection generation              |
-| `OPENAI_API_KEY`    | No       | Powers voice-to-text (button is disabled-gracefully without it) |
+| Variable         | Required | Purpose                                                         |
+| ---------------- | -------- | --------------------------------------------------------------- |
+| `GROQ_API_KEY`   | One of   | Powers the "Groq (Fast)" reflection engine                      |
+| `GEMINI_API_KEY` | these    | Powers the "Gemini (Balanced)" reflection engine                |
+| `OPENAI_API_KEY` | No       | Powers voice-to-text (button degrades gracefully without it)    |
+
+Set the key for whichever engine(s) you want selectable in the in-app toggle.
 
 ## Scripts
 

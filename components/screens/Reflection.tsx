@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { CATS } from "@/lib/categories";
-import type { JournalEntry } from "@/lib/types";
+import type { JournalEntry, Provider } from "@/lib/types";
 import {
   ArrowLeft,
   HeartIcon,
@@ -14,6 +14,7 @@ type Status = "loading" | "crisis" | "typing" | "done" | "error";
 
 export default function Reflection({
   entry,
+  provider,
   initialReflection,
   onBackTopics,
   onKeepWriting,
@@ -23,6 +24,7 @@ export default function Reflection({
   onToggleSave,
 }: {
   entry: JournalEntry;
+  provider: Provider;
   initialReflection?: string | null;
   onBackTopics: () => void;
   onKeepWriting: () => void;
@@ -43,11 +45,18 @@ export default function Reflection({
   const [isLiked, setIsLiked] = useState(false);
   const [isSaved, setIsSaved] = useState(false);
   const [heartPop, setHeartPop] = useState(false);
+  const [fellBackTo, setFellBackTo] = useState<Provider | null>(null);
 
   const persistedRef = useRef(Boolean(initialReflection));
 
   const recap =
     entry.text.length > 240 ? entry.text.slice(0, 240) + "…" : entry.text;
+
+  const ENGINE_LABEL: Record<Provider, string> = {
+    groq: "Groq",
+    gemini: "Gemini",
+    claude: "Claude",
+  };
 
   // Fetch the reflection once for this entry.
   useEffect(() => {
@@ -65,6 +74,7 @@ export default function Reflection({
             mood: entry.mood,
             prompt: entry.prompt,
             text: entry.text,
+            provider,
           }),
           signal: controller.signal,
         });
@@ -72,11 +82,14 @@ export default function Reflection({
           reflection?: string;
           crisis?: boolean;
           error?: string;
+          engine?: Provider;
+          fellBack?: boolean;
         };
         if (cancelled) return;
         if (data.crisis) {
           setStatus("crisis");
         } else if (data.reflection) {
+          if (data.fellBack && data.engine) setFellBackTo(data.engine);
           setReflection(data.reflection);
           setStatus("typing");
         } else {
@@ -181,6 +194,21 @@ export default function Reflection({
             ) : (
               <div className="reflection-text">
                 {status === "typing" ? typed : reflection}
+              </div>
+            )}
+
+            {status === "done" && fellBackTo && (
+              <div
+                style={{
+                  fontSize: ".68rem",
+                  color: "var(--muted)",
+                  fontStyle: "italic",
+                  fontFamily: "'Lora',serif",
+                  marginTop: ".6rem",
+                }}
+              >
+                {ENGINE_LABEL[provider]} was unavailable — reflected with{" "}
+                {ENGINE_LABEL[fellBackTo]} instead.
               </div>
             )}
 

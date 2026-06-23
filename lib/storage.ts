@@ -1,4 +1,4 @@
-import type { HistoryEntry, SavedReflection } from "./types";
+import type { HistoryEntry, Provider, SavedReflection } from "./types";
 
 // localStorage-backed persistence, mirroring the original app's keys so existing
 // data carries over. All access is guarded for SSR (window may be undefined).
@@ -51,4 +51,16 @@ export function loadTodayAnswered(): string[] {
 
 export function saveTodayAnswered(answered: string[]): void {
   write(todayStorageKey(), answered);
+}
+
+const PROVIDER_KEY = "reflect_provider";
+
+export function loadProvider(): Provider {
+  const p = read<Provider>(PROVIDER_KEY, "groq");
+  // Claude isn't live yet — never start on it.
+  return p === "groq" || p === "gemini" ? p : "groq";
+}
+
+export function saveProvider(provider: Provider): void {
+  write(PROVIDER_KEY, provider);
 }

@@ -9,12 +9,15 @@ import {
   saveSaved,
   loadTodayAnswered,
   saveTodayAnswered,
+  loadProvider,
+  saveProvider,
 } from "@/lib/storage";
 import type {
   CatKey,
   GroundingContext,
   HistoryEntry,
   JournalEntry,
+  Provider,
   SavedReflection,
   Screen,
 } from "@/lib/types";
@@ -45,6 +48,7 @@ export default function ReflectApp() {
   const [entries, setEntries] = useState<HistoryEntry[]>([]);
   const [saved, setSaved] = useState<SavedReflection[]>([]);
   const [todayAnswered, setTodayAnswered] = useState<string[]>([]);
+  const [provider, setProviderState] = useState<Provider>("groq");
 
   // Load persisted data + date-dependent values on the client only (avoids
   // SSR/CSR hydration mismatches around localStorage and the current date).
@@ -52,6 +56,7 @@ export default function ReflectApp() {
     setEntries(loadEntries());
     setSaved(loadSaved());
     setTodayAnswered(loadTodayAnswered());
+    setProviderState(loadProvider());
     setPromptIdx(promptIndex());
     setDateStr(
       new Date().toLocaleDateString("en-CA", {
@@ -64,6 +69,11 @@ export default function ReflectApp() {
   }, []);
 
   const navigate = useCallback((s: Screen) => setScreen(s), []);
+
+  const setProvider = useCallback((p: Provider) => {
+    setProviderState(p);
+    saveProvider(p);
+  }, []);
 
   const startGrounding = useCallback((ctx: GroundingContext) => {
     setGroundingContext(ctx);
@@ -221,6 +231,8 @@ export default function ReflectApp() {
         <Journal
           cat={currentCat}
           promptIdx={promptIdx}
+          provider={provider}
+          onProviderChange={setProvider}
           onBack={() => navigate("today")}
           onSubmit={submitEntry}
         />
@@ -241,6 +253,7 @@ export default function ReflectApp() {
       return (
         <Reflection
           entry={currentEntry}
+          provider={provider}
           initialReflection={currentReflection}
           onBackTopics={() => navigate("today")}
           onKeepWriting={() => navigate("journal")}

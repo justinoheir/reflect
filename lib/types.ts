@@ -1,5 +1,7 @@
 export type CatKey = "emotions" | "relationships" | "self" | "stress" | "growth";
 
+export type Provider = "groq" | "gemini" | "claude";
+
 export type Screen =
   | "welcome"
   | "grounding"

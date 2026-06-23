@@ -2,19 +2,24 @@
 
 import { useEffect, useRef, useState } from "react";
 import { CATS, DAILY_PROMPTS, PLACEHOLDERS } from "@/lib/categories";
-import type { CatKey, JournalEntry } from "@/lib/types";
+import type { CatKey, JournalEntry, Provider } from "@/lib/types";
 import { ArrowLeft, MicIcon, StopIcon, SendIcon, SpinnerIcon } from "../icons";
+import ModelToggle from "../ModelToggle";
 
 const MOODS = ["okay", "good", "anxious", "low", "tired", "restless", "grateful"];
 
 export default function Journal({
   cat,
   promptIdx,
+  provider,
+  onProviderChange,
   onBack,
   onSubmit,
 }: {
   cat: CatKey;
   promptIdx: number;
+  provider: Provider;
+  onProviderChange: (p: Provider) => void;
   onBack: () => void;
   onSubmit: (entry: JournalEntry) => void;
 }) {
@@ -221,6 +226,7 @@ export default function Journal({
         </div>
         <div className="word-count">{wordLabel}</div>
       </div>
+      <ModelToggle provider={provider} onChange={onProviderChange} />
       <div className="submit-bar">
         <span className="submit-hint">Private · just for you</span>
         <button className="submit-btn" onClick={submit}>
