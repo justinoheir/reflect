@@ -262,3 +262,9 @@ body{font-family:'DM Sans',sans-serif;background:var(--paper);color:var(--ink);l
 .model-opt.disabled{color:var(--muted);opacity:.55;cursor:not-allowed;}
 .model-opt-tag{font-size:.6rem;font-weight:500;text-transform:uppercase;letter-spacing:.04em;padding:1px 6px;border-radius:99px;background:var(--border-soft);color:var(--muted);}
 .model-opt.active .model-opt-tag{background:var(--teal-light);color:var(--teal);}
+/* ── LOGIN ── */
+.login-form{display:flex;flex-direction:column;gap:.75rem;align-items:center;width:100%;max-width:280px;margin:0 auto;}
+.login-input{width:100%;padding:12px 16px;border:1.5px solid var(--border);border-radius:11px;font-family:'DM Sans',sans-serif;font-size:.95rem;color:var(--ink);background:white;outline:none;transition:border-color .18s;}
+.login-input:focus{border-color:var(--teal);}
+.login-input::placeholder{color:#c5c5bc;}
+.login-form .btn-primary{width:100%;max-width:280px;}

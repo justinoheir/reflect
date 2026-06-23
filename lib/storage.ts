@@ -1,10 +1,10 @@
-import type { HistoryEntry, Provider, SavedReflection } from "./types";
+import type { Provider } from "./types";
 
-// localStorage-backed persistence, mirroring the original app's keys so existing
-// data carries over. All access is guarded for SSR (window may be undefined).
+// Local UI preferences only. Entries and saved reflections now live in Supabase
+// (see lib/db.ts); the only thing kept in localStorage is the chosen reflection
+// engine, which is a per-device preference rather than user data.
 
-const ENTRIES_KEY = "reflect_entries";
-const SAVED_KEY = "reflect_saved";
+const PROVIDER_KEY = "reflect_provider";
 
 function read<T>(key: string, fallback: T): T {
   if (typeof window === "undefined") return fallback;
@@ -21,39 +21,9 @@ function write(key: string, value: unknown): void {
   try {
     window.localStorage.setItem(key, JSON.stringify(value));
   } catch {
-    /* quota or privacy mode — fail silently, same as the original */
+    /* quota or privacy mode — ignore */
   }
 }
-
-export function loadEntries(): HistoryEntry[] {
-  return read<HistoryEntry[]>(ENTRIES_KEY, []);
-}
-
-export function saveEntries(entries: HistoryEntry[]): void {
-  write(ENTRIES_KEY, entries);
-}
-
-export function loadSaved(): SavedReflection[] {
-  return read<SavedReflection[]>(SAVED_KEY, []);
-}
-
-export function saveSaved(saved: SavedReflection[]): void {
-  write(SAVED_KEY, saved);
-}
-
-function todayStorageKey(): string {
-  return "reflect_today_" + new Date().toDateString();
-}
-
-export function loadTodayAnswered(): string[] {
-  return read<string[]>(todayStorageKey(), []);
-}
-
-export function saveTodayAnswered(answered: string[]): void {
-  write(todayStorageKey(), answered);
-}
-
-const PROVIDER_KEY = "reflect_provider";
 
 export function loadProvider(): Provider {
   const p = read<Provider>(PROVIDER_KEY, "groq");

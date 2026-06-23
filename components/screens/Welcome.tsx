@@ -5,9 +5,11 @@ import { HeartIcon, FaceSmile, ArrowRight } from "../icons";
 export default function Welcome({
   onStartGrounding,
   onSkipToTopics,
+  onSignOut,
 }: {
   onStartGrounding: () => void;
   onSkipToTopics: () => void;
+  onSignOut?: () => void;
 }) {
   return (
     <div id="welcome" className="screen active">
@@ -49,6 +51,15 @@ export default function Welcome({
           In crisis?{" "}
           <a href="tel:18334564566">Crisis Services Canada: 1-833-456-4566</a>
         </div>
+        {onSignOut && (
+          <button
+            className="tiny-btn"
+            style={{ marginTop: "1rem" }}
+            onClick={onSignOut}
+          >
+            Sign out
+          </button>
+        )}
       </div>
     </div>
   );

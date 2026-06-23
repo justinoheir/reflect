@@ -14,7 +14,7 @@ keys are never exposed to the browser.
 - **Next.js 15** (App Router) + **React 19** + **TypeScript**
 - **Reflection engine** — switchable in-app between **Groq** (`llama-3.3-70b-versatile`, Fast) and **Google Gemini** (`gemini-2.0-flash`, Balanced), both free tier. Claude is stubbed as "coming soon".
 - OpenAI Whisper — voice-to-text (optional)
-- `localStorage` for entries, saved reflections, and daily progress
+- **Supabase** — magic-link auth + per-user entry storage (Postgres + row-level security)
 
 ## Project structure
 
@@ -32,24 +32,32 @@ components/
   icons.tsx
   screens/              Welcome, Grounding, TopicSelect, Journal,
                         Reflection, Saved, History
+  api/
+    reflect/route.ts    Multi-provider reflection endpoint (Groq/Gemini, server-side keys)
+    transcribe/route.ts OpenAI Whisper proxy (server-side key)
+components/
+  ModelToggle.tsx       Groq/Gemini/Claude engine switcher
 lib/
   categories.ts         Display metadata + daily prompts (client-safe)
   grounding.ts          Grounding/closing variants, senses, body scan
   systemPrompts.ts      Reflection system prompts (server-only)
-  storage.ts            localStorage helpers
+  supabase.ts           Browser Supabase client (auth)
+  db.ts                 Entry / saved-reflection queries (RLS-scoped)
+  storage.ts            Local UI prefs (selected engine)
   types.ts
+supabase/
+  schema.sql            Tables + row-level security (run once)
 ```
 
 ## What changed from the prototype
 
-- The Anthropic call (previously made directly from the browser, with no working
-  key) now runs in `/api/reflect` using a server-side `ANTHROPIC_API_KEY`. Model
-  updated to `claude-opus-4-8`.
-- The OpenAI Whisper call now runs in `/api/transcribe` using a server-side
-  `OPENAI_API_KEY`. Voice entry degrades gracefully (503) if the key is absent.
-- The imperative DOM/screen state machine became React components with
-  `localStorage`-backed state. Storage keys are unchanged, so existing data
-  carries over.
+- Reflection generation runs server-side in `/api/reflect`, switchable between
+  **Groq** and **Gemini** with automatic fallback. Keys never reach the browser.
+- Voice transcription runs in `/api/transcribe` (OpenAI Whisper), degrading
+  gracefully (503) if the key is absent.
+- **Auth + storage:** entries and saved reflections live in Supabase Postgres,
+  scoped per user by row-level security. The app is gated behind a magic-link
+  sign-in. (Only the selected engine stays in `localStorage`.)
 
 ## Setup
 
@@ -61,15 +69,25 @@ npm run dev
 
 Open [http://localhost:3000](http://localhost:3000).
 
+### Supabase setup (one-time)
+
+1. Create a project at [supabase.com](https://supabase.com), then copy the
+   **Project URL** and **publishable (anon) key** into `.env.local`
+   (`NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`).
+2. Run [`supabase/schema.sql`](supabase/schema.sql) in the Supabase **SQL editor**
+   to create the `entries` / `saved_reflections` tables and RLS policies.
+3. In **Authentication → URL Configuration**, set the **Site URL** to your app
+   origin (e.g. `http://localhost:3000`) and add it to **Redirect URLs**.
+
 ### Environment variables
 
-| Variable         | Required | Purpose                                                         |
-| ---------------- | -------- | --------------------------------------------------------------- |
-| `GROQ_API_KEY`   | One of   | Powers the "Groq (Fast)" reflection engine                      |
-| `GEMINI_API_KEY` | these    | Powers the "Gemini (Balanced)" reflection engine                |
-| `OPENAI_API_KEY` | No       | Powers voice-to-text (button degrades gracefully without it)    |
-
-Set the key for whichever engine(s) you want selectable in the in-app toggle.
+| Variable                        | Required | Purpose                                          |
+| ------------------------------- | -------- | ------------------------------------------------ |
+| `NEXT_PUBLIC_SUPABASE_URL`      | Yes      | Supabase project URL (auth + DB)                 |
+| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Yes      | Supabase publishable/anon key (browser-safe)     |
+| `GROQ_API_KEY`                  | One of   | Powers the "Groq (Fast)" reflection engine       |
+| `GEMINI_API_KEY`                | these    | Powers the "Gemini (Balanced)" reflection engine |
+| `OPENAI_API_KEY`                | No       | Powers voice-to-text (degrades gracefully)       |
 
 ## Scripts
 

@@ -33,14 +33,14 @@ export interface JournalEntry {
 }
 
 export interface HistoryEntry extends JournalEntry {
-  id: number;
+  id: string;
   reflection: string | null;
   liked: boolean;
   saved: boolean;
 }
 
 export interface SavedReflection {
-  id: number;
+  id: string;
   reflection: string;
   snippet: string;
   category: CatKey;

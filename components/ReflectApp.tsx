@@ -1,17 +1,18 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import type { User } from "@supabase/supabase-js";
 import { promptIndex } from "@/lib/categories";
+import { supabase, supabaseConfigured } from "@/lib/supabase";
+import { loadProvider, saveProvider } from "@/lib/storage";
 import {
-  loadEntries,
-  saveEntries,
-  loadSaved,
-  saveSaved,
-  loadTodayAnswered,
-  saveTodayAnswered,
-  loadProvider,
-  saveProvider,
-} from "@/lib/storage";
+  fetchEntries,
+  fetchSaved,
+  insertEntry,
+  updateEntryFlags,
+  insertSaved,
+  deleteSaved,
+} from "@/lib/db";
 import type {
   CatKey,
   GroundingContext,
@@ -22,6 +23,7 @@ import type {
   Screen,
 } from "@/lib/types";
 
+import Login from "./screens/Login";
 import Welcome from "./screens/Welcome";
 import Grounding from "./screens/Grounding";
 import TopicSelect from "./screens/TopicSelect";
@@ -31,7 +33,8 @@ import Saved from "./screens/Saved";
 import History from "./screens/History";
 
 export default function ReflectApp() {
-  const [mounted, setMounted] = useState(false);
+  const [authChecked, setAuthChecked] = useState(false);
+  const [user, setUser] = useState<User | null>(null);
   const [screen, setScreen] = useState<Screen>("welcome");
 
   const [promptIdx, setPromptIdx] = useState(0);
@@ -43,19 +46,14 @@ export default function ReflectApp() {
 
   const [currentEntry, setCurrentEntry] = useState<JournalEntry | null>(null);
   const [currentReflection, setCurrentReflection] = useState<string | null>(null);
-  const [currentHistoryId, setCurrentHistoryId] = useState<number | null>(null);
+  const [currentHistoryId, setCurrentHistoryId] = useState<string | null>(null);
 
   const [entries, setEntries] = useState<HistoryEntry[]>([]);
   const [saved, setSaved] = useState<SavedReflection[]>([]);
-  const [todayAnswered, setTodayAnswered] = useState<string[]>([]);
   const [provider, setProviderState] = useState<Provider>("groq");
 
-  // Load persisted data + date-dependent values on the client only (avoids
-  // SSR/CSR hydration mismatches around localStorage and the current date).
+  // Device-local prefs + auth bootstrapping (client only).
   useEffect(() => {
-    setEntries(loadEntries());
-    setSaved(loadSaved());
-    setTodayAnswered(loadTodayAnswered());
     setProviderState(loadProvider());
     setPromptIdx(promptIndex());
     setDateStr(
@@ -65,14 +63,71 @@ export default function ReflectApp() {
         day: "numeric",
       }),
     );
-    setMounted(true);
+
+    if (!supabaseConfigured) {
+      setAuthChecked(true);
+      return;
+    }
+
+    supabase.auth.getSession().then(({ data }) => {
+      setUser(data.session?.user ?? null);
+      setAuthChecked(true);
+    });
+
+    const { data: sub } = supabase.auth.onAuthStateChange((_event, session) => {
+      setUser(session?.user ?? null);
+      if (!session) setScreen("welcome");
+    });
+
+    return () => sub.subscription.unsubscribe();
   }, []);
+
+  // Load the signed-in user's data; clear it on sign-out.
+  const userId = user?.id ?? null;
+  useEffect(() => {
+    if (!userId) {
+      setEntries([]);
+      setSaved([]);
+      return;
+    }
+    let active = true;
+    (async () => {
+      try {
+        const [e, s] = await Promise.all([fetchEntries(), fetchSaved()]);
+        if (active) {
+          setEntries(e);
+          setSaved(s);
+        }
+      } catch (err) {
+        console.error("Failed to load your data:", err);
+      }
+    })();
+    return () => {
+      active = false;
+    };
+  }, [userId]);
+
+  // Topics answered today, derived from entries (no separate store needed).
+  const todayAnswered = useMemo(() => {
+    const today = new Date().toDateString();
+    const set = new Set<string>();
+    for (const e of entries) {
+      if (new Date(e.date).toDateString() === today) set.add(e.category);
+    }
+    return [...set];
+  }, [entries]);
 
   const navigate = useCallback((s: Screen) => setScreen(s), []);
 
   const setProvider = useCallback((p: Provider) => {
     setProviderState(p);
     saveProvider(p);
+  }, []);
+
+  const signOut = useCallback(async () => {
+    await supabase.auth.signOut();
+    setUser(null);
+    setScreen("welcome");
   }, []);
 
   const startGrounding = useCallback((ctx: GroundingContext) => {
@@ -93,109 +148,102 @@ export default function ReflectApp() {
   }, []);
 
   const persistReflection = useCallback(
-    (reflection: string) => {
+    async (reflection: string) => {
       if (!currentEntry) return;
       setCurrentReflection(reflection);
-      const id = Date.now();
-      setCurrentHistoryId(id);
-      setEntries((prev) => {
-        const next: HistoryEntry[] = [
-          { ...currentEntry, reflection, liked: false, saved: false, id },
-          ...prev,
-        ];
-        saveEntries(next);
-        return next;
-      });
-      setTodayAnswered((prev) => {
-        if (prev.includes(currentEntry.category)) return prev;
-        const next = [...prev, currentEntry.category];
-        saveTodayAnswered(next);
-        return next;
-      });
+      try {
+        const row = await insertEntry(currentEntry, reflection);
+        setCurrentHistoryId(row.id);
+        setEntries((prev) => [row, ...prev]);
+      } catch (err) {
+        console.error("Failed to save entry:", err);
+      }
     },
     [currentEntry],
   );
 
   const toggleLike = useCallback(
     (liked: boolean) => {
-      setEntries((prev) => {
-        const next = prev.map((e) =>
-          e.id === currentHistoryId ? { ...e, liked } : e,
-        );
-        saveEntries(next);
-        return next;
-      });
+      if (!currentHistoryId) return;
+      setEntries((prev) =>
+        prev.map((e) => (e.id === currentHistoryId ? { ...e, liked } : e)),
+      );
+      updateEntryFlags(currentHistoryId, { liked }).catch((err) =>
+        console.error("Failed to update like:", err),
+      );
     },
     [currentHistoryId],
   );
 
   const toggleSave = useCallback(
-    (isSaved: boolean) => {
+    async (isSaved: boolean) => {
       if (!currentEntry || !currentReflection) return;
 
       if (isSaved) {
-        setSaved((prev) => {
-          if (prev.some((r) => r.reflection === currentReflection)) return prev;
-          const snippet =
-            currentEntry.text.length > 100
-              ? currentEntry.text.slice(0, 100) + "…"
-              : currentEntry.text;
-          const next: SavedReflection[] = [
-            {
-              id: Date.now(),
-              reflection: currentReflection,
-              snippet,
-              category: currentEntry.category,
-              mood: currentEntry.mood,
-              date: currentEntry.date,
-            },
-            ...prev,
-          ];
-          saveSaved(next);
-          return next;
-        });
+        try {
+          const row = await insertSaved(currentReflection, currentEntry);
+          setSaved((prev) => [row, ...prev]);
+        } catch (err) {
+          console.error("Failed to save reflection:", err);
+        }
       } else {
-        setSaved((prev) => {
-          const next = prev.filter((r) => r.reflection !== currentReflection);
-          saveSaved(next);
-          return next;
-        });
+        const existing = saved.find((r) => r.reflection === currentReflection);
+        if (existing) {
+          setSaved((prev) => prev.filter((r) => r.id !== existing.id));
+          deleteSaved(existing.id).catch((err) =>
+            console.error("Failed to remove saved reflection:", err),
+          );
+        }
       }
 
-      setEntries((prev) => {
-        const next = prev.map((e) =>
-          e.id === currentHistoryId ? { ...e, saved: isSaved } : e,
+      if (currentHistoryId) {
+        setEntries((prev) =>
+          prev.map((e) =>
+            e.id === currentHistoryId ? { ...e, saved: isSaved } : e,
+          ),
         );
-        saveEntries(next);
-        return next;
-      });
+        updateEntryFlags(currentHistoryId, { saved: isSaved }).catch((err) =>
+          console.error("Failed to update saved flag:", err),
+        );
+      }
     },
-    [currentEntry, currentReflection, currentHistoryId],
+    [currentEntry, currentReflection, currentHistoryId, saved],
   );
 
-  const unsave = useCallback((id: number) => {
-    setSaved((prev) => {
-      const next = prev.filter((r) => r.id !== id);
-      saveSaved(next);
-      return next;
-    });
+  const unsave = useCallback((id: string) => {
+    setSaved((prev) => prev.filter((r) => r.id !== id));
+    deleteSaved(id).catch((err) =>
+      console.error("Failed to remove saved reflection:", err),
+    );
   }, []);
 
-  // Grounding exit routing, mirroring the original back/skip/complete behavior.
   const groundingComplete = useCallback(() => setScreen("today"), []);
   const groundingSkip = useCallback(() => setScreen("today"), []);
   const groundingExit = useCallback(() => {
     setScreen(groundingContext === "closing" ? "reflection" : "welcome");
   }, [groundingContext]);
 
-  // Avoid a hydration flash: render the static welcome shell until mounted.
-  if (!mounted) {
+  // ── Render ──
+  if (!authChecked) {
     return (
-      <Welcome
-        onStartGrounding={() => {}}
-        onSkipToTopics={() => {}}
-      />
+      <div
+        style={{
+          minHeight: "100vh",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          color: "var(--muted)",
+          fontFamily: "'Lora',serif",
+          fontStyle: "italic",
+        }}
+      >
+        Loading…
+      </div>
     );
+  }
+
+  if (!user) {
+    return <Login />;
   }
 
   switch (screen) {
@@ -204,6 +252,7 @@ export default function ReflectApp() {
         <Welcome
           onStartGrounding={() => startGrounding("entry")}
           onSkipToTopics={() => navigate("today")}
+          onSignOut={signOut}
         />
       );
     case "grounding":
@@ -223,6 +272,7 @@ export default function ReflectApp() {
           dateStr={dateStr}
           onOpenJournal={openJournal}
           onGround={() => startGrounding("entry")}
+          onSignOut={signOut}
           navigate={navigate}
         />
       );
@@ -246,6 +296,7 @@ export default function ReflectApp() {
             dateStr={dateStr}
             onOpenJournal={openJournal}
             onGround={() => startGrounding("entry")}
+            onSignOut={signOut}
             navigate={navigate}
           />
         );

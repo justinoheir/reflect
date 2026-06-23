@@ -11,6 +11,7 @@ export default function TopicSelect({
   dateStr,
   onOpenJournal,
   onGround,
+  onSignOut,
   navigate,
 }: {
   promptIdx: number;
@@ -18,6 +19,7 @@ export default function TopicSelect({
   dateStr: string;
   onOpenJournal: (cat: CatKey) => void;
   onGround: () => void;
+  onSignOut: () => void;
   navigate: (s: Screen) => void;
 }) {
   const answered = todayAnswered.length;
@@ -29,7 +31,12 @@ export default function TopicSelect({
           <div className="header-dot" />
           <span className="header-brand">Reflect</span>
         </div>
-        <span className="header-date">{dateStr}</span>
+        <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+          <span className="header-date">{dateStr}</span>
+          <button className="tiny-btn" onClick={onSignOut}>
+            Sign out
+          </button>
+        </div>
       </div>
       <div style={{ flex: 1, overflowY: "auto", paddingBottom: ".5rem" }}>
         <div className="today-intro">

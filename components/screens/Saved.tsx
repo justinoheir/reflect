@@ -20,9 +20,9 @@ export default function Saved({
 }: {
   saved: SavedReflection[];
   navigate: (s: Screen) => void;
-  onUnsave: (id: number) => void;
+  onUnsave: (id: string) => void;
 }) {
-  const [copiedId, setCopiedId] = useState<number | null>(null);
+  const [copiedId, setCopiedId] = useState<string | null>(null);
 
   const copy = async (r: SavedReflection) => {
     const cat = r.category ? CATS[r.category] : null;
