@@ -13,7 +13,7 @@ interface ReflectBody {
 }
 
 const GEMINI_MODEL = "gemini-2.0-flash";
-const GROQ_MODEL = "llama-3.3-70b-versatile";
+const GROQ_MODEL = "openai/gpt-oss-120b";
 
 // Result of a provider call: either generated text, or a signal that the entry
 // was blocked by safety filters (→ surface the crisis pathway).
@@ -93,8 +93,11 @@ async function callGroq(system: string, user: string): Promise<ProviderResult> {
         { role: "system", content: system },
         { role: "user", content: user },
       ],
-      max_tokens: 1000,
+      // gpt-oss is a reasoning model: keep effort low so reflections stay
+      // conversational, and cap completion tokens including reasoning.
+      max_completion_tokens: 2048,
       temperature: 0.9,
+      reasoning_effort: "low",
     }),
   });
 
