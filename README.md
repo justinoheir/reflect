@@ -12,7 +12,7 @@ keys are never exposed to the browser.
 ## Stack
 
 - **Next.js 15** (App Router) + **React 19** + **TypeScript**
-- **Reflection engine** — switchable in-app between **Groq** (`llama-3.3-70b-versatile`, Fast) and **Google Gemini** (`gemini-2.0-flash`, Balanced), both free tier. Claude is stubbed as "coming soon".
+- **Reflection engine** — switchable in-app between **Groq** (`openai/gpt-oss-120b`, Fast) and **Google Gemini** (`gemini-2.0-flash`, Balanced), both free tier. Claude is stubbed as "coming soon".
 - OpenAI Whisper — voice-to-text (optional)
 - **Supabase** — magic-link auth + per-user entry storage (Postgres + row-level security)
 
